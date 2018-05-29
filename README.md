@@ -14,6 +14,9 @@ source venv/bin/activate
 ### Dependencies
 
 ```
+git clone https://github.com/yeatmanlab/pyAFQ
+pip install -r pyAFQ/requirements.txt
+pip install ./pyAFQ
 pip install -r requirements.txt
 ```
 
