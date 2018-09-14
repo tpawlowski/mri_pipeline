@@ -15,19 +15,21 @@ class ImageSpout(Spout):
     def initialize(self, config, context):
         self.data = nib.load(config["benchmark_config"]["data_path"])
         self.classes = pd.read_csv(config["benchmark_config"]["classes_path"], header=None)
+        self.shuffle_seed = config["benchmark_config"]["shuffle_seed"]
 
         self.iterator = 0
         self.emit_count = 0
 
     def next_tuple(self):
         while self.iterator < self.data.shape[-1]:
-            classification = self.classes.iat[self.iterator, 0]
+            random_iterator = (self.iterator * self.shuffle_seed) % self.data.shape[-1]
+            classification = self.classes.iat[random_iterator, 0]
             if classification in ['Rest', 'Active']:
-                self.log("emit {} with image {} of class {}".format(self.emit_count, self.iterator, classification))
-                self.emit([self.emit_count, self.data.dataobj[..., self.iterator], classification])
+                self.log("emit {} with image {} of class {}".format(self.emit_count, random_iterator, classification))
+                self.emit([self.emit_count, self.data.dataobj[..., random_iterator], classification])
                 self.emit_count += 1
                 self.iterator += 1
                 break
             else:
-                self.log("skipping {} of class {}".format(self.iterator, classification))
+                self.log("skipping {} of class {}".format(random_iterator, classification))
                 self.iterator += 1

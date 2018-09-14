@@ -1,3 +1,5 @@
+import skimage
+
 import AFQ.registration as afr
 import numpy as np
 
@@ -5,7 +7,7 @@ from heronpy.api.bolt.bolt import Bolt
 
 
 class AffineRegistrationBolt(Bolt):
-    outputs = ['id', 'mri', 'classification']
+    outputs = ['id', 'features', 'classification']
 
     def initialize(self, config, context):
         self.reference_image = None
@@ -27,5 +29,9 @@ class AffineRegistrationBolt(Bolt):
     def emit_registered(self, values):
         id, image, classification = values
         registered_image, _ = [image, None] if id == 0 else afr.affine_registration(image, self.reference_image)
-        self.log("registered image {} {} {}".format(id, (registered_image - self.reference_image)[self.mask].flatten(), self.reference_image[self.mask].flatten()))
-        self.emit([id, (registered_image - self.reference_image)[self.mask].flatten(), classification])
+
+
+
+        features = skimage.filters.gaussian(registered_image - self.reference_image, sigma=2)[self.mask].flatten()
+        self.log("registered image {} {}".format(id, features))
+        self.emit([id, features, classification])

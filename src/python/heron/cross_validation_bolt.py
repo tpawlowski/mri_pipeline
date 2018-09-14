@@ -1,9 +1,12 @@
+import numpy
 from heronpy.api.bolt.bolt import Bolt
+from sklearn.model_selection import KFold, cross_val_score
 from sklearn.linear_model import SGDClassifier, PassiveAggressiveClassifier, Perceptron
 from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
 
 
-class ClassifierBolt(Bolt):
+class CrossValidationBolt(Bolt):
     outputs = ['prediction', 'actual', 'id', 'training_count']
 
     def initialize(self, config, context):
@@ -16,27 +19,20 @@ class ClassifierBolt(Bolt):
             self.clf = PassiveAggressiveClassifier()
         elif self.config['model'] == 'Perceptron':
             self.clf = Perceptron(penalty=self.config['penalty'])
+        elif self.config['model'] == 'SVC':
+            self.clf = SVC(kernel='linear', C=100, probability=True)
 
-        self.trained_count = 0
+        self.data = []
+        self.labels = []
         self.pure_training_size = config["benchmark_config"]["pure_training_size"]
-        self.results = []
 
     def process(self, tup):
         id, image_data, classification = tup.values
 
-        x = [image_data]
-        if self.trained_count >= self.pure_training_size:
-            prediction = self.clf.predict(x)[0]
-            self.results.append(prediction == classification)
-            self.log("{} prediction {} result: {} (predicted: {}, actual: {}) accuracy: {}%, last 32: {}%".format(
-                self.config,
-                len(self.results),
-                prediction == classification, prediction, classification,
-                100 * sum(self.results) // len(self.results),
-                100 * sum(self.results[-32:]) // len(self.results[-32:])))
-            self.emit([prediction, classification, id, self.trained_count])
+        self.data.append(image_data)
+        self.labels.append(classification)
 
-        y = [classification]
-        self.clf.partial_fit(x, y, classes=['Active', 'Rest'])
-        self.trained_count += 1
-        self.log("trained {}".format(self.trained_count))
+        if len(self.data) >= self.pure_training_size and len(self.data) % 10 == 8:
+            cv = KFold(n_splits=5)
+            cv_score = cross_val_score(self.clf, self.data, self.labels, cv=cv)
+            self.log('{} {} mean crossval acc: {}, stdDev: {}'.format(len(self.data), self.config, numpy.mean(cv_score), numpy.std(cv_score)))
